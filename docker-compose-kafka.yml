@@ -1,0 +1,31 @@
+services:
+  zookeeper:
+    image: bitnamilegacy/zookeeper:3.8
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    networks:
+      - hadoop_net
+
+  kafka:
+    image: bitnamilegacy/kafka:3.5
+    container_name: kafka-broker
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    depends_on:
+      - zookeeper
+    networks:
+      - hadoop_net
+
+networks:
+  hadoop_net:
+    external: true
+    name: hadoop_net

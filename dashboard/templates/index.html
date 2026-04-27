@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🌋 GempaRadar Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">🌋 GempaRadar</div>
+  <div class="header-right">
+    <span class="badge-live">● LIVE</span>
+    <span id="last-update" class="update-time">–</span>
+  </div>
+</header>
+
+<div id="status-bar" class="status-bar">Memuat data...</div>
+
+<main class="grid">
+
+  <!-- PETA INTERAKTIF (Bonus 3) -->
+  <section class="card card-wide">
+    <h2 class="card-title">🗺️ Peta Gempa Real-time</h2>
+    <div id="map"></div>
+    <div class="map-legend">
+      <span style="color:#6ee7f7">● Mikro &lt;M3</span>
+      <span style="color:#fbbf24">● Minor M3-4</span>
+      <span style="color:#f97316">● Sedang M4-5</span>
+      <span style="color:#ef4444">● Kuat ≥M5</span>
+    </div>
+  </section>
+
+  <!-- STATISTIK CEPAT -->
+  <section class="card">
+    <h2 class="card-title">📊 Statistik Magnitudo</h2>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-val" id="s-total">–</div><div class="stat-lbl">Total Gempa</div></div>
+      <div class="stat-box"><div class="stat-val" id="s-avg">–</div><div class="stat-lbl">Rata-rata M</div></div>
+      <div class="stat-box"><div class="stat-val" id="s-max">–</div><div class="stat-lbl">Terkuat</div></div>
+      <div class="stat-box"><div class="stat-val" id="s-kuat">–</div><div class="stat-lbl">Gempa Kuat (≥M5)</div></div>
+    </div>
+    <canvas id="chartMag" height="180"></canvas>
+  </section>
+
+  <!-- TOP WILAYAH -->
+  <section class="card">
+    <h2 class="card-title">📍 Top 10 Wilayah Aktif</h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Wilayah</th><th>Gempa</th><th>Max M</th></tr></thead>
+        <tbody id="tbl-wilayah"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- DISTRIBUSI KEDALAMAN -->
+  <section class="card">
+    <h2 class="card-title">🪨 Distribusi Kedalaman</h2>
+    <canvas id="chartDepth" height="200"></canvas>
+    <div id="korelasi-note" class="note-box" style="margin-top:.8rem"></div>
+  </section>
+
+  <!-- GEMPA TERBARU LIVE -->
+  <section class="card">
+    <h2 class="card-title">🔴 Gempa Terbaru <span class="live-dot">●</span></h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Waktu</th><th>M</th><th>Lokasi</th><th>Kedalaman</th></tr></thead>
+        <tbody id="tbl-live"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- BERITA RSS -->
+  <section class="card">
+    <h2 class="card-title">📰 Berita Gempa Terbaru</h2>
+    <div id="news-list" class="news-list"></div>
+  </section>
+
+  <!-- HISTORI HARIAN (Bonus 4) -->
+  <section class="card card-wide">
+    <h2 class="card-title">📅 Tren Harian (Historical Comparison)</h2>
+    <canvas id="chartDaily" height="120"></canvas>
+  </section>
+
+  <!-- ML RESULT (Bonus 2) -->
+  <section class="card">
+    <h2 class="card-title">🤖 Predictive Model (MLlib)</h2>
+    <div id="ml-panel" class="ml-panel"></div>
+  </section>
+
+  <!-- POLA PER JAM -->
+  <section class="card">
+    <h2 class="card-title">🕐 Pola Aktivitas Per Jam</h2>
+    <canvas id="chartHourly" height="200"></canvas>
+  </section>
+
+</main>
+
+<footer class="footer">
+  GempaRadar · Big Data ETS · Sumber: USGS + BMKG · Auto-refresh 60 detik
+</footer>
+
+<script>
+const map = L.map("map").setView([-2.5, 118], 4);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {attribution:"© OpenStreetMap"}).addTo(map);
+
+const magColor = m => m<3?"#6ee7f7":m<4?"#fbbf24":m<5?"#f97316":"#ef4444";
+
+let markers = [];
+function updateMap(quakes) {
+  markers.forEach(m=>map.removeLayer(m)); markers=[];
+  quakes.forEach(q => {
+    if(!q.latitude||!q.longitude) return;
+    const c = L.circleMarker([q.latitude,q.longitude],{
+      radius: Math.max(4,(q.magnitude||2)*3),
+      color: magColor(q.magnitude), fillColor: magColor(q.magnitude),
+      fillOpacity:.75, weight:1
+    }).addTo(map);
+    c.bindPopup(`<b>M${q.magnitude}</b><br>${q.lokasi||q.place}<br>${q.kedalaman_km||q.depth_km} km`);
+    markers.push(c);
+  });
+}
+
+let chartMag,chartDepth,chartDaily,chartHourly;
+
+function renderSpark(d) {
+  const st = d.analisis1_stats?.[0]||{};
+  document.getElementById("s-total").textContent = st.total_gempa??"–";
+  document.getElementById("s-avg").textContent   = st.avg_magnitude??"–";
+  document.getElementById("s-max").textContent   = st.max_magnitude??"–";
+  document.getElementById("s-kuat").textContent  = st.gempa_kuat??"–";
+
+  const md = d.analisis1_mag_dist||[];
+  if(chartMag) chartMag.destroy();
+  chartMag = new Chart(document.getElementById("chartMag"),{
+    type:"doughnut",
+    data:{
+      labels: md.map(r=>r.kategori),
+      datasets:[{data:md.map(r=>r.jumlah),
+        backgroundColor:["#6ee7f7","#fbbf24","#f97316","#ef4444"]}]
+    },
+    options:{plugins:{legend:{position:"bottom"}}}
+  });
+
+  const wb = document.getElementById("tbl-wilayah");
+  wb.innerHTML = (d.analisis2_wilayah||[]).map((r,i)=>
+    `<tr><td>${i+1}</td><td>${r.wilayah}</td><td>${r.jumlah_gempa}</td><td>${r.max_mag}</td></tr>`
+  ).join("");
+
+  const dd = d.analisis3_depth||[];
+  if(chartDepth) chartDepth.destroy();
+  chartDepth = new Chart(document.getElementById("chartDepth"),{
+    type:"bar",
+    data:{labels:dd.map(r=>r.kategori_kedalaman),
+      datasets:[{label:"Jumlah",data:dd.map(r=>r.jumlah),
+        backgroundColor:["#6ee7f7","#fbbf24","#ef4444"]}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  const kor = d.analisis3_korelasi?.[0]?.korelasi_mag_depth;
+  if(kor!=null) document.getElementById("korelasi-note").textContent =
+    `Korelasi Magnitude–Kedalaman: ${kor}`;
+
+  const hist = (d.bonus_historical_daily||[]).slice().reverse();
+  if(chartDaily) chartDaily.destroy();
+  chartDaily = new Chart(document.getElementById("chartDaily"),{
+    type:"line",
+    data:{labels:hist.map(r=>r.tanggal),
+      datasets:[{label:"Jumlah Gempa",data:hist.map(r=>r.jumlah_gempa),
+        borderColor:"#f97316",backgroundColor:"rgba(249,115,22,.1)",fill:true}]}
+  });
+
+  const hr = (d.bonus_historical_hourly||[]).sort((a,b)=>a.jam-b.jam);
+  if(chartHourly) chartHourly.destroy();
+  chartHourly = new Chart(document.getElementById("chartHourly"),{
+    type:"bar",
+    data:{labels:hr.map(r=>`${String(r.jam).padStart(2,"0")}:00`),
+      datasets:[{label:"Frekuensi",data:hr.map(r=>r.frekuensi),
+        backgroundColor:"#6ee7f7"}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  const ml = d.bonus_ml||{};
+  document.getElementById("ml-panel").innerHTML = ml.status==="success"
+    ? `<div class="ml-acc">Akurasi: <b>${(ml.accuracy*100).toFixed(1)}%</b></div>
+       <div class="ml-model">Model: ${ml.model}</div>`
+    : `<p class="note-box">${ml.status==="insufficient_data"?"⚠️ Data belum cukup untuk training.":"Spark belum dijalankan."}</p>`;
+}
+
+function renderLive(d) {
+  const quakes = d.earthquakes||[];
+  updateMap(quakes);
+  document.getElementById("tbl-live").innerHTML = [...quakes].reverse().map(q => {
+    const cls = (q.magnitude||0)>=5?"row-strong":(q.magnitude||0)>=4?"row-moderate":"";
+    return `<tr class="${cls}">
+      <td>${(q.time_utc||"").slice(11,19)}</td>
+      <td><b>M${q.magnitude}</b></td>
+      <td>${(q.lokasi||q.place||"").slice(0,40)}</td>
+      <td>${q.kedalaman_km||q.depth_km||"?"} km</td></tr>`;
+  }).join("");
+
+  const news = d.news||[];
+  document.getElementById("news-list").innerHTML = news.length===0
+    ? "<p class='note-box'>Berita belum ada. Jalankan producer_rss.py</p>"
+    : news.map(n=>`<div class="news-item">
+        <a href="${n.url||n.link||"#"}" target="_blank">${n.judul||n.title}</a>
+        <span class="news-src">${n.sumber||"RSS"}</span>
+      </div>`).join("");
+
+  document.getElementById("last-update").textContent =
+    "Update: " + new Date().toLocaleTimeString("id-ID");
+}
+
+async function fetchAll() {
+  const sb = document.getElementById("status-bar");
+  try {
+    const [sRes, lRes] = await Promise.all([fetch("/api/results"), fetch("/api/live")]);
+    if(sRes.ok){ renderSpark(await sRes.json()); sb.textContent="✅ Data Spark tersedia"; sb.className="status-bar ok"; }
+    else { sb.textContent="⚠️ Jalankan spark/analysis.py dulu"; sb.className="status-bar warn"; }
+    if(lRes.ok) renderLive(await lRes.json());
+  } catch(e) {
+    sb.textContent="❌ Error: "+e.message; sb.className="status-bar err";
+  }
+}
+
+fetchAll();
+setInterval(fetchAll, 60000);
+</script>
+</body>
+</html>

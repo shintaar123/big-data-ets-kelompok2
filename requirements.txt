@@ -1,0 +1,5 @@
+kafka-python-ng
+requests==2.31.0
+feedparser==6.0.11
+flask==3.0.3
+pyspark==3.5.1   
