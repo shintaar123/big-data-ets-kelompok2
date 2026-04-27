@@ -9,23 +9,11 @@ os.environ["PATH"] = r"D:\JDK-17\bin;" + os.environ.get("PATH", "")
 
 # ── FIX WINDOWS: PATH SPASI ───────────────────────────────────
 if sys.platform == "win32":
-    import ctypes
-    buf = ctypes.create_unicode_buffer(1024)
-
-    # short path untuk python executable
-    ctypes.windll.kernel32.GetShortPathNameW(sys.executable, buf, 1024)
-    short_python = buf.value
-    if short_python:
-        os.environ["PYSPARK_PYTHON"] = short_python
-        os.environ["PYSPARK_DRIVER_PYTHON"] = short_python
-
-    # short path untuk pyspark
-    import pyspark
-    pyspark_dir = os.path.dirname(pyspark.__file__)
-    ctypes.windll.kernel32.GetShortPathNameW(pyspark_dir, buf, 1024)
-    short_pyspark = buf.value
-    if short_pyspark:
-        os.environ["SPARK_HOME"] = short_pyspark
+    os.environ["PYSPARK_PYTHON"] = r"D:\Py312\python.exe"
+    os.environ["PYSPARK_DRIVER_PYTHON"] = r"D:\Py312\python.exe"
+    os.environ["SPARK_HOME"] = r"D:\Py312\Lib\site-packages\pyspark"
+    os.environ["TEMP"] = r"D:\Temp"
+    os.environ["TMP"] = r"D:\Temp"
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
