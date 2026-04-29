@@ -25,6 +25,8 @@ HDFS_HOST = os.getenv("HDFS_HOST", "localhost")
 HDFS_PORT = os.getenv("HDFS_PORT", "8020")
 HDFS_BASE = f"hdfs://{HDFS_HOST}:{HDFS_PORT}"
 HDFS_PATH = f"{HDFS_BASE}/data/gempa/api"
+HDFS_DATANODE_HOST = os.getenv("HDFS_DATANODE_HOST", "localhost")
+HDFS_DATANODE_PORT = os.getenv("HDFS_DATANODE_PORT", "9866")
 ALLOW_LOCAL_FALLBACK = os.getenv("ALLOW_LOCAL_FALLBACK", "0") == "1"
 LOCAL_PATH = os.path.join("dashboard", "data", "live_api.json")
 LOCAL_PATH_URI = "file:///" + os.path.abspath(LOCAL_PATH).replace("\\", "/")
@@ -37,6 +39,8 @@ spark_builder = (
     .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "1g"))
 )
 spark_builder = spark_builder.config("spark.hadoop.fs.defaultFS", HDFS_BASE)
+spark_builder = spark_builder.config("dfs.client.use.datanode.hostname", "false")
+spark_builder = spark_builder.config("dfs.namenode.servicerpc-address", f"{HDFS_HOST}:{HDFS_PORT}")
 spark = spark_builder.getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 USING_HDFS_SOURCE = False

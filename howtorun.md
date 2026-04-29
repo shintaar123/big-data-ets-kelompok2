@@ -95,6 +95,7 @@ pip install -r requirements.txt
 - flask==3.0.3 - Web framework dashboard
 - pyspark==3.5.1 - Apache Spark untuk analysis
 - numpy>=1.26,<3 - Numerical computing
+- python-dateutil==2.8.2 - Parse tanggal dari RSS feed (baru)
 
 Tunggu sampai selesai dan tidak ada error ✅
 
@@ -203,21 +204,47 @@ python kafka/producer_rss.py
 ```
 
 **Apa yang terjadi:**
-- Mengambil artikel berita tentang gempa dari RSS feed (BMKG, Tempo)
+- Mengambil artikel berita nasional dari RSS feed (Kompas, CNN Indonesia)
 - Mengirim ke Kafka topic `gempa-rss`
 - Polling setiap 5 menit
+- **BARU:** Cache artikel di `.rss_cache.json` agar tidak double
+- **BARU:** Ambil artikel dari 7 hari terakhir (bukan hanya real-time)
+- **⚠️ PENTING:** Feed yang digunakan adalah berita nasional general (Kompas, CNN) — artikel gempa akan masuk ketika ada berita gempa yang di-publish di feed tersebut
 
-**Output yang diharapkan:**
+**Output yang diharapkan (v2 - dengan improvements):**
 ```
 Producer RSS dimulai -> topic: gempa-rss
-==================================================
+Backfill: 7 hari terakhir
+Polling interval: 300 detik (5 menit)
 
 [14:24:10] Mengambil RSS feed...
-  [KIRIM] Gempa M5.2 Guncang Sulawesi Utara, Berpotensi...
-  [KIRIM] BMKG Catat 15 Gempa Susulan di Zona Subduksi...
-[14:24:12] berhasil memproses 2 artikel baru ke topic 'gempa-rss'
-Menunggu 5 menit...
+
+  📰 Feed: Kompas.com
+     Artikel dalam feed: 22
+     ✓ Banjir Terjang Jakarta, Ratusan Rumah Terendam
+     ✓ Gempa Guncang Sulawesi, BMKG Imbau Waspada...
+
+  📰 Feed: CNN Indonesia - Nasional
+     Artikel dalam feed: 15
+     ✓ Update Perikanan: Nelayan Tangkap Ikan Langka
+     ✓ Bencana Alam Dimonitor Ketat
+
+[14:24:12] SUMMARY:
+  Sent:          5 artikel baru
+  Skipped cache: 32 artikel (sudah dikirim sebelumnya)
+  Skipped old:   0 artikel (lebih lama dari 7 hari)
+  Errors:        0
+  Total cache:   37 URL
+
+Menunggu 5 menit sebelum polling berikutnya...
 ```
+
+**Notes:**
+- ✅ **Persistent cache:** `.rss_cache.json` disimpan otomatis di folder project
+- ✅ **Jangan hapus file `.rss_cache.json`** — ini menjaga duplikasi
+- ✅ Untuk reset cache (debugging only): hapus file `.rss_cache.json` lalu restart producer
+- ✅ Untuk ubah backfill: `$env:RSS_BACKFILL_DAYS="14"` sebelum run producer
+- ⚠️ **PENTING:** Karena menggunakan feed berita nasional general (bukan feed spesifik gempa), artikel gempa akan masuk hanya ketika ada berita gempa di-publish. Untuk pengujian system, silakan tunggu atau modifikasi URL feed.
 
 ✅ **Jangan tutup terminal ini!** Biarkan berjalan di background.
 
