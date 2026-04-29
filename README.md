@@ -1,94 +1,116 @@
-# 🌋 GempaRadar - Big Data Earthquake Pipeline (ETS)
+# GempaRadar - Big Data Earthquake Pipeline
 
-## 📜 Deskripsi
-Sistem monitoring gempa bumi real-time yang mengimplementasikan arsitektur Data Lakehouse modern dengan Apache Kafka, HDFS, Apache Spark, dan Flask Dashboard.
+## Deskripsi
+GempaRadar adalah pipeline monitoring gempa bumi real-time untuk ETS Big Data topik 6. Sistem mengambil data gempa dari USGS dan berita dari RSS BMKG/Tempo, mengalirkannya melalui Kafka, menyimpannya ke HDFS, menganalisisnya dengan Spark, lalu menampilkannya di dashboard Flask.
 
-## 🏗️ Arsitektur
-`[USGS API/RSS] → [Kafka Producer] → [Kafka Topics] → [Consumer to HDFS] → [Spark Analysis] → [Flask Dashboard]`
+## Arsitektur
+`[USGS API + RSS] -> [Kafka Producers] -> [Topics gempa-api / gempa-rss] -> [Consumer to HDFS] -> [Spark Analysis] -> [Flask Dashboard]`
 
-## ✨ Fitur
-### ✅ Analisis Wajib
-1. **Statistik Gempa**: Distribusi magnitude, trend harian, top 10 lokasi
-2. **Bahaya Seismik**: Alert level, potensi tsunami, gempa signifikan (≥M5.5)
-3. **Pola Temporal-Spasial**: Distribusi per jam, hotspot koordinat
+## Analisis Wajib
+1. Distribusi magnitudo gempa.
+2. Top 10 wilayah paling aktif.
+3. Distribusi kedalaman gempa.
 
-### 🎁 Bonus (+10 Poin)
-1. 📩 **Real-time Alert**: Notifikasi Telegram otomatis untuk gempa ≥M6.0
-2. 🤖 **Predictive Model**: Spark MLlib (RandomForest) prediktor gempa signifikan
-3. 🗺️ **Interactive Map**: Leaflet.js dengan marker dinamis berdasarkan magnitude
-4. 📅 **Historical Comparison**: Perbandingan data hari ini vs 30 hari terakhir
-5. 📱 **Mobile Responsive**: Dashboard adaptif untuk semua ukuran layar
+## Bonus yang Diimplementasikan
+1. Alert Telegram untuk gempa signifikan.
+2. Spark MLlib RandomForest untuk klasifikasi gempa kuat.
+3. Dashboard chart dan peta interaktif.
+4. Tren aktivitas harian dan per jam.
 
-## 🛠️ Cara Menjalankan
+## Tim
+- Zaenal Mustofa - setup Docker Hadoop dan Kafka
+- Shinta Alya Ramadani - producer API USGS
+- Salsa Bil Ulla - producer RSS dan consumer ke HDFS
+- Angga Firmansyah - Spark analysis
+- Hafiz Ramadhan - Flask dashboard
 
-### ─── PERSIAPAN AWAL (Sekali Saja) ─────────
-Buka terminal baru di folder proyek, lalu buat virtual environment:
+## Persiapan
+1. Buat virtual environment dan install dependency:
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
-
-### ─── STEP 1: Hadoop (Anggota 1) ─────────
-Buka terminal dan jalankan container Hadoop:
+2. Pastikan Docker Desktop aktif.
+3. Buat Docker network yang dipakai dua compose file:
 ```powershell
 docker network create hadoop_net
-docker compose -f docker-compose-hadoop.yml up -d
-# Tunggu 30 detik
-docker exec hadoop-namenode hdfs dfs -mkdir -p /data/gempa/api
-docker exec hadoop-namenode hdfs dfs -mkdir -p /data/gempa/rss
-docker exec hadoop-namenode hdfs dfs -mkdir -p /data/gempa/hasil
-docker exec hadoop-namenode hdfs dfs -chmod -R 777 /data
 ```
 
-### ─── STEP 2: Kafka (Anggota 1) ─────────
-Jalankan container Kafka:
+## Menjalankan Sistem End-to-End
+1. Jalankan Kafka dan Hadoop:
 ```powershell
 docker compose -f docker-compose-kafka.yml up -d
-# Tunggu 20 detik, lalu verifikasi:
-docker exec kafka-broker kafka-topics.sh --list --bootstrap-server localhost:9092
+docker compose -f docker-compose-hadoop.yml up -d
 ```
-
-### ─── STEP 3: Producer API (Anggota 2) ─────────
-Buka **Terminal Baru**, lalu jalankan:
+2. Verifikasi container aktif:
+```powershell
+docker ps
+```
+3. Jalankan producer API:
 ```powershell
 .\venv\Scripts\Activate.ps1
 python kafka/producer_api.py
 ```
-
-### ─── STEP 4: Producer RSS (Anggota 3) ─────────
-Buka **Terminal Baru**, lalu jalankan:
+4. Jalankan producer RSS:
 ```powershell
 .\venv\Scripts\Activate.ps1
 python kafka/producer_rss.py
 ```
-
-### ─── STEP 5: Consumer ke HDFS (Anggota 3) ─────────
-Buka **Terminal Baru**, lalu jalankan:
+5. Jalankan consumer ke HDFS:
 ```powershell
 .\venv\Scripts\Activate.ps1
 python kafka/consumer_to_hdfs.py
 ```
-*(Tunggu 2 menit sampai muncul pesan `[Batch #1] API flushed ✅`)*
-
-### ─── STEP 6: Spark Analysis (Anggota 4) ─────────
-Buka **Terminal Baru**, lalu jalankan:
+6. Tunggu minimal 2 menit lalu cek HDFS:
+```powershell
+docker exec -it hadoop-namenode hdfs dfs -ls -R /data/gempa
+```
+7. Jalankan Spark:
 ```powershell
 .\venv\Scripts\Activate.ps1
-python spark/spark_analysis.py
+python spark/analysis.py
 ```
-
-### ─── STEP 7: Dashboard (Anggota 5) ─────────
-Buka **Terminal Baru**, lalu jalankan:
+8. Jalankan dashboard:
 ```powershell
 .\venv\Scripts\Activate.ps1
 python dashboard/app.py
 ```
-*(Buka browser → http://localhost:5000)*
+9. Buka `http://localhost:5000`.
 
-## 👥 Tim Kelompok
-- Zaenal Mustofa - 50272410
-- Shinta Alya Ramadani - 5027241016
-- Salsa Bil Ulla - 5027241
-- Angga Firmansyah - 5027241062
-- Hafiz Ramadhan - 50272410
+## Verifikasi ETS
+1. List Kafka topic:
+```powershell
+docker exec -it kafka-broker kafka-topics.sh --list --bootstrap-server localhost:9092
+```
+2. Cek consumer group:
+```powershell
+docker exec -it kafka-broker kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group gemparadar-consumer
+```
+3. Cek HDFS:
+```powershell
+docker exec -it hadoop-namenode hdfs dfs -ls -R /data/gempa
+```
+
+## Mode Simulasi Lokal
+Mode ini hanya untuk pengujian saat Docker/HDFS belum aktif.
+1. Validasi producer tanpa Kafka:
+```powershell
+$env:DRY_RUN="1"
+python kafka/producer_api.py
+python kafka/producer_rss.py
+```
+2. Simulasi target HDFS ke folder lokal `mock_hdfs`:
+```powershell
+$env:SIMULATE_HDFS="1"
+python kafka/consumer_to_hdfs.py
+```
+3. Jalankan Spark dengan fallback data lokal:
+```powershell
+$env:ALLOW_LOCAL_FALLBACK="1"
+python spark/analysis.py
+```
+
+## Catatan
+1. Dashboard membaca `dashboard/data/spark_results.json`, `live_api.json`, dan `live_rss.json`.
+2. Spark secara default wajib membaca dari HDFS. Fallback lokal hanya dipakai untuk simulasi, bukan mode penilaian utama ETS.

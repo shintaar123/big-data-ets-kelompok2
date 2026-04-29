@@ -26,8 +26,6 @@ services:
       HADOOP_HOME: /opt/hadoop
     env_file:
       - hadoop.env
-    volumes:
-      - datanode_data:/tmp/hadoop-hadoop/dfs/data
     depends_on:
       - namenode
     networks:
