@@ -40,6 +40,13 @@ cd d:\tes-bigdata-kafka
 
 ### 1.4 Setup Python Virtual Environment
 
+⚠️ **PENTING:** Jika folder project pernah dipindah/di-rename, **hapus folder `venv` lama** terlebih dahulu!
+
+```powershell
+# Jika ada venv lama
+Remove-Item -Recurse -Force venv
+```
+
 **Windows (PowerShell):**
 ```powershell
 python -m venv venv
@@ -60,7 +67,23 @@ source venv/bin/activate
 
 ✅ **Indikator aktivasi:** Nama folder `(venv)` muncul di awal command prompt
 
+**Verifikasi venv benar:**
+```powershell
+pip --version
+# Harus menunjukkan path dengan "venv"
+```
+
 ### 1.5 Install Python Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+⚠️ **Pastikan berhasil!** Output harus:
+```
+Successfully installed kafka-python-ng-... requests-2.31.0 feedparser-6.0.11 flask-3.0.3 pyspark-3.5.1 numpy-...
+```
+
+Jika ada error `ModuleNotFoundError: No module named 'requests'`, jalankan ulang:
 ```bash
 pip install -r requirements.txt
 ```
@@ -347,18 +370,20 @@ python dashboard/app.py
 ```
 
 **Apa yang terjadi:**
-- Flask web server berjalan di port 5000
+- Flask web server berjalan di port **8000** (bukan 5000)
 - Membaca data dari:
   - `dashboard/data/spark_results.json` - Hasil analisis Spark
   - `dashboard/data/live_api.json` - Live earthquake data
   - `dashboard/data/live_rss.json` - Live news articles
 
+⚠️ **Port sudah diubah ke 8000** untuk menghindari conflict dengan aplikasi lain.
+
 **Output yang diharapkan:**
 ```
-GempaRadar Dashboard -> http://localhost:5000
+GempaRadar Dashboard -> http://localhost:8000
  * Serving Flask app 'app'
  * Debug mode: on
- * Running on http://0.0.0.0:5000
+ * Running on http://0.0.0.0:8000
  * WARNING in app.run(), this is a development server. Do not use it in production.
  * Press CTRL+C to quit.
 ```
@@ -369,7 +394,7 @@ GempaRadar Dashboard -> http://localhost:5000
 
 **Buka browser (Chrome, Firefox, Edge, Safari, dll) dan pergi ke:**
 ```
-http://localhost:5000
+http://localhost:8000
 ```
 
 **Apa yang akan dilihat di dashboard:**
@@ -461,7 +486,7 @@ curl http://localhost:5000/api/results
 - [ ] Consumer jalan dan menyimpan data ke HDFS
 - [ ] File JSON ada di `/data/gempa/api/` dan `/data/gempa/rss/`
 - [ ] Spark analysis berhasil dan membuat `spark_results.json`
-- [ ] Dashboard berjalan di `http://localhost:5000`
+- [ ] Dashboard berjalan di `http://localhost:8000`
 - [ ] Data divisualisasikan di dashboard
 
 ---
@@ -607,6 +632,77 @@ docker exec -it kafka-broker kafka-topics.sh --list --bootstrap-server localhost
 
 ---
 
+## ⚠️ ISSUE YANG SUDAH DIHADAPI & SOLUSINYA
+
+### Problem: "Unable to create process... venv\Scripts\python.exe not found"
+
+**Penyebab:** Folder project dipindah/direname, tapi venv lama masih mereferensi path lama
+
+**Solusi (WAJIB DILAKUKAN):**
+```powershell
+# 1. Hapus venv lama
+Remove-Item -Recurse -Force venv
+
+# 2. Buat venv baru di lokasi yang benar
+python -m venv venv
+
+# 3. Aktifkan venv
+.\venv\Scripts\Activate.ps1
+
+# 4. Install requirements
+pip install -r requirements.txt
+```
+
+**Verifikasi berhasil:**
+```powershell
+pip --version
+# Harus menunjukkan path dengan "venv"
+```
+
+---
+
+### Problem: "ModuleNotFoundError: No module named 'requests'"
+
+**Penyebab:** Dependencies belum terinstall atau venv tidak aktif
+
+**Solusi:**
+```powershell
+# 1. Pastikan venv aktif (ada (venv) di prompt)
+.\venv\Scripts\Activate.ps1
+
+# 2. Verifikasi pip
+pip --version
+
+# 3. Install requirements lagi
+pip install -r requirements.txt
+
+# 4. Tunggu sampai sukses
+# Output harus: Successfully installed kafka-python-ng-... requests-2.31.0 ...
+```
+
+---
+
+### Problem: "An attempt was made to access a socket in a way forbidden by its access permissions"
+
+**Penyebab:** Port 5000 sudah digunakan program lain atau firewall Windows memblokir
+
+**Solusi (SUDAH DITERAPKAN):**
+Port dashboard sudah diubah dari **5000 → 8000** di file `dashboard/app.py`.
+
+Tinggal jalankan:
+```powershell
+python dashboard/app.py
+```
+
+Tidak perlu set `PORT` environment variable lagi. Dashboard akan otomatis berjalan di port **8000**.
+
+Akses browser:
+```
+http://localhost:8000
+```
+
+---
+
 ## 🎯 MODE SIMULASI LOKAL (Optional - Tanpa Docker)
 
 Jika Docker bermasalah, bisa simulasi sepenuhnya di lokal:
@@ -713,8 +809,8 @@ python spark/analysis.py
 python dashboard/app.py
 
 # ===== BROWSER =====
-# Open dashboard
-http://localhost:5000
+# Open dashboard (Port: 8000)
+http://localhost:8000
 ```
 
 ---
