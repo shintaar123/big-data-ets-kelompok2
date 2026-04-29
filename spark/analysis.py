@@ -39,8 +39,7 @@ spark_builder = (
     .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "1g"))
 )
 spark_builder = spark_builder.config("spark.hadoop.fs.defaultFS", HDFS_BASE)
-spark_builder = spark_builder.config("dfs.client.use.datanode.hostname", "false")
-spark_builder = spark_builder.config("dfs.namenode.servicerpc-address", f"{HDFS_HOST}:{HDFS_PORT}")
+spark_builder = spark_builder.config("spark.hadoop.dfs.client.use.datanode.hostname", "false")
 spark = spark_builder.getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 USING_HDFS_SOURCE = False
