@@ -1,6 +1,25 @@
 # GempaRadar - Panduan Lengkap Menjalankan Proyek
 
-> **GempaRadar** adalah pipeline monitoring gempa bumi real-time yang mengintegrasikan Kafka, Hadoop HDFS, Apache Spark, dan Flask Dashboard. Sistem ini mengambil data gempa dari USGS API dan berita dari RSS BMKG/Tempo, memproses dengan Spark, dan menampilkan hasil di dashboard interaktif.
+> **GempaRadar** adalah pipeline monitoring gempa bumi real-time yang mengintegrasikan Kafka, Hadoop HDFS, Apache Spark, dan Flask Dashboard. Sistem ini mengambil data gempa dari USGS API dan berita dari RSS (Antara News + CNN Indonesia), memproses dengan Spark, dan menampilkan hasil di dashboard interaktif.
+
+---
+
+## 🚀 QUICK START - ALUR EKSEKUSI (April 2026 - UPDATED)
+
+**Jalankan 5 terminal dalam urutan ini:**
+
+| # | Terminal | Command | Tujuan |
+|---|----------|---------|--------|
+| 1️⃣ | Setup | `pip install -r requirements.txt` | Install dependencies |
+| 2️⃣ | Docker | `docker compose -f docker-compose-hadoop.yml down && docker compose -f docker-compose-hadoop.yml up -d` | Start HDFS (restart untuk apply network fix) |
+| 3️⃣ | Docker | `docker compose -f docker-compose-kafka.yml up -d` | Start Kafka |
+| 4️⃣ | Producer API | `python kafka/producer_api.py` | Ambil data gempa dari USGS |
+| 5️⃣ | Producer RSS | `python kafka/producer_rss.py` | Ambil berita dari Antara News + CNN |
+| 6️⃣ | Consumer | `python kafka/consumer_to_hdfs.py` | Simpan Kafka data ke HDFS |
+| 7️⃣ | Spark | `python spark/analysis.py` atau `$env:ALLOW_LOCAL_FALLBACK="1"; python spark/analysis.py` | Analisis data (tunggu 2-3 min setelah producers berjalan) |
+| 8️⃣ | Dashboard | `python dashboard/app.py` | Buka web di http://localhost:8000 |
+
+⏳ **Waktu:** ~2-3 menit dari setup sampai dashboard live
 
 ---
 
@@ -127,7 +146,22 @@ Creating kafka-broker ... done
 
 ### 2.2 Jalankan Hadoop HDFS
 
-**Buka Terminal/PowerShell BARU (tetap di folder project):**
+**⚠️ PENTING (PERUBAHAN BARU - April 2026):**
+
+Jika ini pertama kali menjalankan, atau Docker containers belum ter-restart setelah fix network:
+
+```bash
+# Hentikan container lama (jika ada)
+docker compose -f docker-compose-hadoop.yml down
+
+# Hapus volume lama supaya fresh start
+docker volume prune -f
+
+# Jalankan ulang dengan config baru
+docker compose -f docker-compose-hadoop.yml up -d
+```
+
+**Atau jika sudah ter-restart sebelumnya:**
 ```bash
 docker compose -f docker-compose-hadoop.yml up -d
 ```
@@ -138,7 +172,7 @@ Creating hadoop-namenode ... done
 Creating hadoop-datanode ... done
 ```
 
-⏳ **Tunggu 10-15 detik** untuk NameNode initialize.
+⏳ **Tunggu 30-60 detik** untuk NameNode initialize dan HDFS siap.
 
 ### 2.3 Verifikasi Semua Container Jalan
 ```bash
@@ -211,7 +245,7 @@ python kafka/producer_rss.py
 - **BARU:** Ambil artikel dari 7 hari terakhir (bukan hanya real-time)
 - **⚠️ PENTING:** Feed yang digunakan adalah berita nasional general (Kompas, CNN) — artikel gempa akan masuk ketika ada berita gempa yang di-publish di feed tersebut
 
-**Output yang diharapkan (v2 - dengan improvements):**
+**Output yang diharapkan (v2 - dengan improvements & updated feeds):**
 ```
 Producer RSS dimulai -> topic: gempa-rss
 Backfill: 7 hari terakhir
@@ -219,32 +253,33 @@ Polling interval: 300 detik (5 menit)
 
 [14:24:10] Mengambil RSS feed...
 
-  📰 Feed: Kompas.com
-     Artikel dalam feed: 22
-     ✓ Banjir Terjang Jakarta, Ratusan Rumah Terendam
-     ✓ Gempa Guncang Sulawesi, BMKG Imbau Waspada...
+  Feed: Berita Terkini - ANTARA News
+     Artikel dalam feed: 50
+     ✓ Gempa Berkekuatan 5.2 Guncang Sulawesi Tenggara
+     ✓ BMKG Imbau Waspada Gempa Susulan
 
-  📰 Feed: CNN Indonesia - Nasional
-     Artikel dalam feed: 15
-     ✓ Update Perikanan: Nelayan Tangkap Ikan Langka
-     ✓ Bencana Alam Dimonitor Ketat
+  Feed: CNN Indonesia | Berita Terkini Nasional
+     Artikel dalam feed: 100
+     ✓ Update Bencana Alam: Pantau Aktivitas Seismic
+     ✓ Jaksa Agung Lantik 14 Kajati
 
 [14:24:12] SUMMARY:
-  Sent:          5 artikel baru
-  Skipped cache: 32 artikel (sudah dikirim sebelumnya)
+  Sent:          8 artikel baru
+  Skipped cache: 42 artikel (sudah dikirim sebelumnya)
   Skipped old:   0 artikel (lebih lama dari 7 hari)
   Errors:        0
-  Total cache:   37 URL
+  Total cache:   50 URL
 
 Menunggu 5 menit sebelum polling berikutnya...
 ```
 
 **Notes:**
+- ✅ **Updated Feeds (April 2026):** Menggunakan Antara News + CNN Indonesia (Kompas feed no longer available)
 - ✅ **Persistent cache:** `.rss_cache.json` disimpan otomatis di folder project
 - ✅ **Jangan hapus file `.rss_cache.json`** — ini menjaga duplikasi
 - ✅ Untuk reset cache (debugging only): hapus file `.rss_cache.json` lalu restart producer
 - ✅ Untuk ubah backfill: `$env:RSS_BACKFILL_DAYS="14"` sebelum run producer
-- ⚠️ **PENTING:** Karena menggunakan feed berita nasional general (bukan feed spesifik gempa), artikel gempa akan masuk hanya ketika ada berita gempa di-publish. Untuk pengujian system, silakan tunggu atau modifikasi URL feed.
+- ℹ️ **Feed coverage:** Antara News (breaking news) + CNN Indonesia (national news). Artikel gempa akan masuk ketika ada berita gempa di-publish di kedua feed tersebut.
 
 ✅ **Jangan tutup terminal ini!** Biarkan berjalan di background.
 
@@ -316,6 +351,19 @@ docker exec -it hadoop-namenode hdfs dfs -cat /data/gempa/api/*.json | head -50
 
 Spark akan membaca data dari HDFS, melakukan analisis, dan menghasilkan insights untuk dashboard.
 
+### 5.0 ⚠️ PENTING - SAFE MODE HDFS
+
+Setelah HDFS startup, sometimes it enters "safe mode" sambil waiting untuk data blocks replicate. Jika ini terjadi:
+
+```bash
+# Disable safe mode (jika HDFS stuck di safe mode ON)
+docker exec hadoop-namenode hdfs dfsadmin -safemode leave
+
+# Verify safe mode OFF
+docker exec hadoop-namenode hdfs dfsadmin -safemode get
+# Output harus: "Safe mode is OFF"
+```
+
 ### 5.1 Terminal 4 - Spark Analysis
 
 **Buka Terminal/PowerShell BARU:**
@@ -323,6 +371,23 @@ Spark akan membaca data dari HDFS, melakukan analisis, dan menghasilkan insights
 .\venv\Scripts\Activate.ps1
 python spark/analysis.py
 ```
+
+**⚠️ CATATAN PENTING (April 2026):**
+Jika mendapat error `BlockMissingException: Could not obtain block` atau HDFS tidak bisa diakses:
+
+**Opsi A - Gunakan Local Fallback (Recommended untuk testing pertama kali):**
+```bash
+.\venv\Scripts\Activate.ps1
+$env:ALLOW_LOCAL_FALLBACK="1"
+python spark/analysis.py
+```
+↑ Spark akan membaca dari file lokal `dashboard/data/live_api.json` jika HDFS tidak accessible.
+
+**Opsi B - Tunggu HDFS data replication (Recommended untuk production):**
+Pastikan producers sudah running cukup lama sehingga HDFS punya data:
+1. Tunggu `producer_api.py` & `producer_rss.py` berjalan minimal **2-3 menit**
+2. Tunggu `consumer_to_hdfs.py` menyimpan batch data ke HDFS
+3. Baru jalankan Spark (tanpa ALLOW_LOCAL_FALLBACK)
 
 **Apa yang terjadi:**
 - Membaca data gempa dari HDFS `/data/gempa/api/`
