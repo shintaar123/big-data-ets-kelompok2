@@ -1,42 +1,16 @@
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0f1117;--bg2:#1a1d2e;--border:#2a2d3e;--accent:#f97316;--accent2:#6ee7f7;--text:#e2e8f0;--muted:#94a3b8;--radius:12px}
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px}
-.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between}
-.logo{font-size:1.3rem;font-weight:700;color:var(--accent)}
-.header-right{display:flex;align-items:center;gap:1rem}
-.badge-live{background:#ef444422;color:#ef4444;border:1px solid #ef4444;border-radius:99px;padding:.2rem .7rem;font-size:.75rem;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.update-time{color:var(--muted);font-size:.8rem}
-.status-bar{text-align:center;padding:.4rem;font-size:.8rem;background:#1e2235;color:var(--muted)}
-.status-bar.ok{background:#052e16;color:#22c55e}
-.status-bar.warn{background:#451a03;color:#fbbf24}
-.status-bar.err{background:#450a0a;color:#ef4444}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;max-width:1400px;margin:1rem auto;padding:0 1rem}
-.card-wide{grid-column:1/-1}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.2rem;display:flex;flex-direction:column;gap:.8rem}
-.card-title{font-size:.95rem;font-weight:600;color:var(--accent2)}
-#map{height:380px;border-radius:8px;z-index:0}
-.map-legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.75rem}
-.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem}
-.stat-box{background:#12151f;border-radius:8px;padding:.8rem;text-align:center}
-.stat-val{font-size:1.6rem;font-weight:700;color:var(--accent)}
-.stat-lbl{font-size:.7rem;color:var(--muted);margin-top:.2rem}
-.table-wrap{overflow-x:auto}
-.data-table{width:100%;border-collapse:collapse;font-size:.8rem}
-.data-table th{background:#12151f;color:var(--muted);padding:.5rem .6rem;text-align:left}
-.data-table td{padding:.45rem .6rem;border-bottom:1px solid var(--border)}
-.data-table tr:hover td{background:#1e2235}
-.row-strong td{color:#ef4444}
-.row-moderate td{color:#fbbf24}
-.note-box{background:#12151f;border-left:3px solid var(--accent);padding:.6rem .8rem;border-radius:4px;font-size:.8rem;color:var(--muted)}
-.news-list{display:flex;flex-direction:column;gap:.6rem}
-.news-item{background:#12151f;border-radius:6px;padding:.6rem .8rem}
-.news-item a{color:var(--text);text-decoration:none;font-size:.85rem;display:block}
-.news-item a:hover{color:var(--accent2)}
-.news-src{font-size:.7rem;color:var(--muted)}
-.ml-panel{display:flex;flex-direction:column;gap:.6rem}
-.ml-acc{font-size:1.4rem;font-weight:700;color:#22c55e}
-.ml-model{font-size:.8rem;color:var(--muted)}
-.live-dot{color:#ef4444;animation:pulse 2s infinite}
-.footer{text-align:center;color:var(--muted);font-size:.75rem;padding:1.5rem;border-top:1px solid var(--border);margin-top:1rem}
-@media(max-width:600px){.grid{grid-template-columns:1fr;padding:0 .5rem}#map{height:260px}.stat-grid{grid-template-columns:repeat(2,1fr)}}
+/* GempaRadar styles - all embedded in index.html */
+.leaflet-popup-content-wrapper {
+  background: #16161d !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 12px !important;
+  color: #e8e8f0 !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+}
+
+.leaflet-popup-tip {
+  background: #16161d !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+}

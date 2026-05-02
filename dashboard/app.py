@@ -15,7 +15,7 @@ app = Flask(
     static_folder=os.path.join(BASE_DIR, "static"),
 )
 DATA_DIR = os.path.join(BASE_DIR, "data")
-PORT = int(os.getenv("PORT", "8000"))
+PORT = int(os.getenv("PORT", "5000"))
 
 
 def read_json(filename):

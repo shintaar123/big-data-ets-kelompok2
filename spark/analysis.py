@@ -1,3 +1,10 @@
+import sys
+try:
+    import distutils
+except ImportError:
+    import setuptools
+    sys.modules['distutils'] = setuptools._distutils
+
 import json
 import os
 import subprocess
