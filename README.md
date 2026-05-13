@@ -504,3 +504,169 @@ Saat pertama kali dijalankan, belum banyak data di HDFS sehingga analisis Spark 
 **Tools & Library Tambahan**
 - feedparser — https://feedparser.readthedocs.io/
 - Docker Documentation — https://docs.docker.com/
+
+## 📝 REVISI: Spark Analysis → Continuous Mode
+
+> **Alasan revisi:** Sesuai arahan dosen, Spark analysis harus berjalan **otomatis dan kontinu** — bukan one-shot batch yang harus dijalankan ulang manual setiap kali ada data baru. Revisi ini membuat Spark session tetap hidup dan me-reload data dari HDFS secara berkala.
+
+### Ringkasan Perubahan
+
+| Aspek | Sebelum (v1) | Sesudah (v2 — Revisi) |
+|-------|-------------|----------------------|
+| Mode eksekusi | One-shot batch (jalankan sekali, selesai) | **Continuous loop** (analisis ulang setiap 60 detik) |
+| Spark session | Dibuat dan di-stop setiap kali run | Dibuat **sekali**, hidup selamanya sampai Ctrl+C |
+| Sumber data HDFS | Langsung via `spark.read.json("hdfs://...")` | **Docker bridge** (`docker exec hdfs dfs -cat`) → file staging lokal |
+| ML model | Spark MLlib `RandomForestClassifier` | **scikit-learn** `RandomForestClassifier` (lebih cepat untuk dataset kecil) |
+| ML frekuensi | Setiap kali run | Setiap **5 siklus** (`ML_EVERY_N_CYCLES`), hasil di-cache |
+| Hasil analisis | Disimpan sekali ke `spark_results.json` | **Diperbarui terus** setiap siklus |
+| Hasil ke HDFS | Tidak | Hasil analisis juga disimpan ke `/data/gempa/hasil/` di HDFS |
+| Dependency baru | — | `scikit-learn` (tambah ke pip install) |
+
+### File yang Diubah
+
+#### 1. `spark/analysis.py` — Rewrite Total
+
+Perubahan utama pada file ini:
+
+**a) Continuous Loop**
+```python
+# SEBELUM: one-shot
+if __name__ == "__main__":
+    # ... jalankan analisis sekali ...
+    spark.stop()
+
+# SESUDAH: continuous loop
+def main():
+    cycle = 0
+    while True:
+        cycle += 1
+        run_analysis_cycle(cycle)
+        time.sleep(INTERVAL_SECONDS)  # default: 60 detik
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Dihentikan oleh pengguna.")
+    finally:
+        spark.stop()
+```
+
+**b) HDFS Docker Bridge (bukan koneksi langsung)**
+```python
+# SEBELUM: Spark langsung baca HDFS (sering gagal dari Windows host)
+df = spark.read.json("hdfs://namenode:8020/data/gempa/api/")
+
+# SESUDAH: Docker bridge — cat dari container, simpan ke file staging
+def fetch_from_hdfs_bridge():
+    result = subprocess.run(
+        ["docker", "exec", "hadoop-namenode", "sh", "-lc",
+         "hdfs dfs -cat /data/gempa/api/*.json"],
+        capture_output=True, timeout=30,
+    )
+    # Simpan ke tmp/spark_bridge/api_from_hdfs.json
+    with open(STAGED_PATH, "wb") as fh:
+        fh.write(result.stdout)
+    return STAGED_PATH
+
+# Spark baca dari file staging lokal
+df = spark.read.option("multiLine", True).json("file:///..." + staged_path)
+```
+
+**c) ML: scikit-learn menggantikan Spark MLlib**
+```python
+# SEBELUM: Spark MLlib (lambat untuk dataset kecil, sering error)
+from pyspark.ml.classification import RandomForestClassifier
+# ... VectorAssembler, Pipeline, dll
+
+# SESUDAH: scikit-learn (cepat, stabil)
+from sklearn.ensemble import RandomForestClassifier as SkRF
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+
+# Hanya dijalankan setiap 5 siklus untuk performa
+if cycle % ML_EVERY_N_CYCLES == 1:
+    rows = df.select("kedalaman_km", "longitude", "latitude", "magnitude").dropna().collect()
+    X = np.array([[r.kedalaman_km, r.longitude, r.latitude] for r in rows])
+    y = np.array([1 if r.magnitude >= 5 else 0 for r in rows])
+    clf = SkRF(n_estimators=50, random_state=42)
+    clf.fit(X_train, y_train)
+    acc = accuracy_score(y_test, clf.predict(X_test))
+```
+
+**d) Simpan hasil analisis ke HDFS**
+```python
+# BARU: Hasil analisis juga ditulis balik ke HDFS
+def save_result_to_hdfs(records, hdfs_dir, filename):
+    # docker cp local_file hadoop-namenode:/tmp/file
+    # docker exec hadoop-namenode hdfs dfs -put -f /tmp/file hdfs_dir/
+    ...
+
+# Output ke HDFS:
+# /data/gempa/hasil/mag_dist/mag_dist.json
+# /data/gempa/hasil/wilayah/wilayah.json
+# /data/gempa/hasil/depth/depth.json
+# /data/gempa/hasil/daily/daily.json
+```
+
+**e) Konfigurasi via Environment Variable**
+
+| Variable | Default | Fungsi |
+|----------|---------|--------|
+| `SPARK_INTERVAL` | `60` | Interval antar siklus (detik) |
+| `SPARK_ML_EVERY` | `5` | Jalankan ML setiap N siklus |
+| `SPARK_DRIVER_MEMORY` | `1g` | Memori driver Spark |
+
+#### 2. `requirements.txt` — Tambah scikit-learn
+
+```diff
+ kafka-python-ng
+ requests==2.31.0
+ feedparser==6.0.11
+ flask==3.0.3
+ pyspark==3.5.1
+ numpy>=1.26,<3
+ python-dateutil==2.8.2
++scikit-learn
+```
+
+> **Catatan:** `scikit-learn` perlu di-install manual: `pip install scikit-learn`
+
+### Cara Menjalankan (Revisi)
+
+Langkah sama seperti sebelumnya, tapi pada **TAHAP Spark**:
+
+```powershell
+# Set Java 11 (WAJIB)
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-11.0.30.7-hotspot"
+$env:PATH = "$env:JAVA_HOME\bin;" + $env:PATH
+$env:PYSPARK_PYTHON = (Get-Command python).Source
+$env:PYSPARK_DRIVER_PYTHON = (Get-Command python).Source
+
+.\venv\Scripts\Activate.ps1
+python spark/analysis.py
+```
+
+**Perbedaan:** Spark sekarang **tidak berhenti sendiri**. Akan terus loop dan memperbarui `spark_results.json` setiap 60 detik. Tekan **Ctrl+C** untuk menghentikan.
+
+Output contoh:
+```
+============================================================
+  GempaRadar — Spark Continuous Analysis
+  Interval: setiap 60 detik
+  Tekan Ctrl+C untuk berhenti.
+============================================================
+
+============================================================
+  Siklus #1  —  2026-05-13 09:10:00
+============================================================
+  [DATA] HDFS bridge: 20 record
+  [ML] Menjalankan RandomForest sklearn (siklus #1)…
+  [ML] Selesai: {'status': 'success', 'accuracy': 0.75, ...}
+  [HDFS] /data/gempa/hasil/mag_dist/mag_dist.json ✓
+  [HDFS] /data/gempa/hasil/wilayah/wilayah.json ✓
+  [OK] spark_results.json diperbarui  |  total gempa: 20  |  sumber: bridge
+
+  Menunggu 60 detik…  (siklus berikutnya: #2)
+```
+<img width="992" height="373" alt="image" src="https://github.com/user-attachments/assets/7a376b96-6eea-4678-a0a7-fae21fe6f217" />
